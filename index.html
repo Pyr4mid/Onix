@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Onix - Dark Web Search</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            background: #050507;
+            font-family: 'Cairo', sans-serif;
+            color: #d8ffe8;
+            overflow-x: hidden;
+        }
+        #matrixCanvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+            opacity: 0.4;
+        }
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 2;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.1) 3px, rgba(0,0,0,0) 4px);
+            mix-blend-mode: multiply;
+            animation: scanShift 8s linear infinite;
+        }
+        @keyframes scanShift { 0% { background-position: 0 0; } 100% { background-position: 0 100px; } }
+        .container {
+            position: relative;
+            z-index: 5;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .net-status {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14px;
+            color: #2ee88a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 8px rgba(46,232,138,0.4);
+        }
+        .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #2ee88a;
+            box-shadow: 0 0 10px #2ee88a;
+            animation: pulse 1.6s infinite;
+        }
+        .dot.warning { background: #ff6b6b; box-shadow: 0 0 10px #ff6b6b; }
+        .dot.success { background: #2ee88a; box-shadow: 0 0 10px #2ee88a; }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .onion-icon {
+            font-size: 70px;
+            filter: drop-shadow(0 0 30px #2ee88a);
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .logo h1 {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 38px;
+            color: #eafff4;
+            text-shadow: 0 0 20px #2ee88a;
+            line-height: 1.1;
+            margin: 0;
+        }
+        .logo h1::after { content: ''; display: none; }
+        .logo .sub-desc {
+            color: #5a6b68;
+            font-size: 16px;
+            letter-spacing: 2px;
+            font-weight: 400;
+            margin-top: 2px;
+        }
+        
+        .search-box {
+            width: 100%;
+            max-width: 650px;
+            margin: 20px auto;
+            position: relative;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 18px 22px 18px 80px;
+            font-size: 18px;
+            font-family: 'Share Tech Mono', monospace;
+            border: 2px solid rgba(46,232,138,0.3);
+            border-radius: 50px;
+            background: rgba(8,12,10,0.9);
+            color: #d8ffe8;
+            outline: none;
+            transition: 0.3s;
+        }
+        .search-box input:focus {
+            border-color: #2ee88a;
+            box-shadow: 0 0 25px rgba(46,232,138,0.2);
+        }
+        .search-box input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .search-box button {
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #0f2b1e;
+            border: none;
+            color: #2ee88a;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            transition: 0.3s;
+        }
+        .search-box button:hover:not(:disabled) {
+            background: #2ee88a;
+            color: #050507;
+        }
+        .search-box button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .warning-box {
+            width: 100%;
+            max-width: 650px;
+            margin: 15px auto;
+            padding: 20px 25px;
+            background: rgba(255, 50, 50, 0.15);
+            border: 2px solid #ff3333;
+            border-radius: 16px;
+            color: #ff6b6b;
+            text-align: center;
+            display: none;
+            font-size: 16px;
+            animation: blinkWarning 1.5s ease-in-out infinite;
+        }
+        @keyframes blinkWarning {
+            0%, 100% { border-color: #ff3333; box-shadow: 0 0 15px rgba(255,50,50,0.2); }
+            50% { border-color: #ff6666; box-shadow: 0 0 30px rgba(255,50,50,0.4); }
+        }
+        .warning-box .icon { font-size: 32px; display: block; margin-bottom: 10px; }
+        .warning-box .sub { font-size: 14px; color: #ff9999; margin-top: 8px; }
+        .retry-btn {
+            margin-top: 12px;
+            background: #ff3333;
+            border: none;
+            color: #fff;
+            padding: 10px 25px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+        .retry-btn:hover { background: #ff5555; transform: scale(1.05); }
+        .results-section {
+            width: 100%;
+            max-width: 850px;
+            margin-top: 30px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .result-item {
+            background: rgba(8,12,10,0.85);
+            border: 1px solid #2ee88a33;
+            border-radius: 12px;
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            word-break: break-all;
+            transition: 0.3s;
+        }
+        .result-item:hover { border-color: #2ee88a88; }
+        .result-item .link { color: #b0f0d0; font-size: 13px; }
+        .result-item .title { color: #eafff4; font-weight: bold; font-size: 16px; }
+        .result-item a { color: #2ee88a; font-size: 20px; margin-right: 10px; }
+        .download-btn {
+            background: #0f2b1e;
+            border: 2px solid #2ee88a;
+            color: #2ee88a;
+            padding: 14px 32px;
+            border-radius: 40px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 25px;
+            align-self: center;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .download-btn:hover:not(:disabled) {
+            background: #2ee88a;
+            color: #050507;
+        }
+        .download-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .back-button {
+            position: fixed;
+            bottom: 25px; right: 25px;
+            background: #0f2b1e;
+            color: #2ee88a;
+            width: 55px; height: 55px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 2px solid #2ee88a;
+            font-size: 26px;
+            z-index: 999;
+            transition: 0.3s;
+        }
+        .back-button.show { display: flex; }
+        .back-button:hover {
+            background: #2ee88a;
+            color: #050507;
+        }
+        .loader {
+            border: 3px solid #2ee88a33;
+            border-top: 3px solid #2ee88a;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .footer { margin-top: 30px; color: #3a4a44; font-size: 12px; letter-spacing: 1px; }
+        .footer .highlight { color: #2ee88a; }
+    </style>
+</head>
+<body>
+    <canvas id="matrixCanvas"></canvas>
+    <div class="scanlines"></div>
+
+    <div class="container">
+        <div class="net-status">
+            <span class="dot" id="statusDot"></span>
+            <span id="statusText">🔍 جاري التحقق من الاتصال...</span>
+        </div>
+
+        <div class="logo">
+            <div class="onion-icon">🧅</div>
+            <h1>Onix</h1>
+            <div class="sub-desc">Dark Web Search Engine</div>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="ابحث عن مواقع .onion..." disabled>
+            <button id="searchBtn" disabled><i class="fas fa-search"></i></button>
+        </div>
+
+        <div class="warning-box" id="warningBox">
+            <div class="icon">⚠️</div>
+            <div id="warningMessage">يجب تشغيل تطبيق Orbot أولاً!</div>
+            <div class="sub" id="warningDetail">Tor غير متصل على المنفذ 9050</div>
+            <button class="retry-btn" id="retryBtn"><i class="fas fa-redo"></i> إعادة المحاولة</button>
+        </div>
+
+        <div id="resultsContainer" class="results-section">
+            <h3 style="color:#2ee88a; text-align:center;">🌐 نتائج البحث</h3>
+            <div id="resultsList"></div>
+            <button class="download-btn" id="downloadBtn" disabled>
+                <i class="fas fa-file-download"></i> تحميل النتائج (.txt)
+            </button>
+        </div>
+
+        <div class="footer">Onix v1.0 — مدعوم بـ <span class="highlight">Ahmia</span> + <span class="highlight">Torch</span> + <span class="highlight">Onion</span></div>
+    </div>
+
+    <button class="back-button" id="backButton"><i class="fas fa-arrow-left"></i></button>
+
+    <script>
+        const canvas = document.getElementById('matrixCanvas');
+        const ctx = canvas.getContext('2d');
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        resizeCanvas(); window.addEventListener('resize', resizeCanvas);
+        const glyphs = '01アイウエオカキクケコ';
+        const fontSize = 16;
+        let columns = Math.floor(canvas.width / fontSize);
+        let drops = new Array(columns).fill(1);
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(5,5,7,0.08)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#2ee88a';
+            ctx.font = fontSize + 'px monospace';
+            for (let i = 0; i < drops.length; i++) {
+                const text = glyphs[Math.floor(Math.random() * glyphs.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 60);
+
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsList = document.getElementById('resultsList');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const backButton = document.getElementById('backButton');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        const warningBox = document.getElementById('warningBox');
+        const warningMessage = document.getElementById('warningMessage');
+        const warningDetail = document.getElementById('warningDetail');
+        const retryBtn = document.getElementById('retryBtn');
+
+        let currentResults = [];
+        let searchQuery = '';
+        let torConnected = false;
+
+        function updateUI(torOk, message, detail = '') {
+            torConnected = torOk;
+            
+            if (torOk) {
+                statusDot.className = 'dot success';
+                statusText.textContent = '✅ ' + message;
+                warningBox.style.display = 'none';
+                searchInput.disabled = false;
+                searchBtn.disabled = false;
+                searchInput.placeholder = 'ابحث عن مواقع .onion...';
+            } else {
+                statusDot.className = 'dot warning';
+                statusText.textContent = '⚠️ ' + message;
+                warningBox.style.display = 'block';
+                warningMessage.textContent = '⚠️ ' + message;
+                warningDetail.textContent = detail || 'Tor غير متصل على المنفذ 9050';
+                searchInput.disabled = true;
+                searchBtn.disabled = true;
+                searchInput.placeholder = '⛔ انتظر تشغيل Orbot...';
+                downloadBtn.disabled = true;
+            }
+        }
+
+        async function checkTor() {
+            statusText.textContent = '⏳ جاري التحقق من Tor...';
+            try {
+                const response = await fetch('/check-tor');
+                const data = await response.json();
+                if (data.connected) {
+                    updateUI(true, 'Tor متصل — جاهز للبحث', '');
+                } else {
+                    updateUI(false, 'Tor غير متصل!', data.message || data.detail);
+                }
+            } catch (error) {
+                updateUI(false, 'الخادم غير متصل!', 'تأكد من تشغيل: node server.js');
+                console.error(error);
+            }
+        }
+
+        async function performSearch(query) {
+            if (!query.trim()) {
+                statusText.textContent = '⚠️ أدخل كلمة بحث';
+                return;
+            }
+            if (!torConnected) {
+                warningBox.style.display = 'block';
+                warningMessage.textContent = '⚠️ يجب تشغيل Orbot أولاً!';
+                return;
+            }
+
+            searchQuery = query.trim();
+            statusText.textContent = '⏳ جاري البحث في المحركات...';
+            resultsContainer.style.display = 'flex';
+            resultsList.innerHTML = '<div class="loader"></div><div style="text-align:center;color:#aaa;">جارٍ جلب النتائج...</div>';
+            backButton.classList.add('show');
+            downloadBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    if (data.error === 'TOR_NOT_CONNECTED') {
+                        updateUI(false, 'Tor غير متصل!', data.details || '');
+                        resultsList.innerHTML = `<div style="text-align:center;color:#ff6b6b;">⚠️ ${data.message}</div>`;
+                        statusText.textContent = '⚠️ Tor غير متصل';
+                        return;
+                    }
+                    resultsList.innerHTML = `<div style="text-align:center;color:#ff6b6b;">❌ ${data.error}</div>`;
+                    statusText.textContent = '❌ خطأ';
+                    return;
+                }
+
+                if (data.links && data.links.length > 0) {
+                    currentResults = data.links;
+                    renderResults(currentResults);
+                    statusText.textContent = `✅ تم العثور على ${currentResults.length} رابط من ${data.total_found}`;
+                    downloadBtn.disabled = false;
+                } else {
+                    resultsList.innerHTML = '<div style="text-align:center;color:#ff6b6b;">❌ لم يتم العثور على نتائج</div>';
+                    statusText.textContent = '❌ لا نتائج';
+                    currentResults = [];
+                    downloadBtn.disabled = true;
+                }
+            } catch (error) {
+                resultsList.innerHTML = `
+                    <div style="text-align:center;color:#ff6b6b;">
+                        ⚠️ خطأ في الاتصال بالخادم<br>
+                        <small style="color:#888;">تأكد من تشغيل: node server.js</small>
+                    </div>
+                `;
+                statusText.textContent = '⚠️ الخادم غير متصل';
+                console.error(error);
+                downloadBtn.disabled = true;
+            }
+        }
+
+        function renderResults(links) {
+            resultsList.innerHTML = '';
+            links.forEach(link => {
+                const item = document.createElement('div');
+                item.className = 'result-item';
+                item.innerHTML = `
+                    <div style="flex:1;">
+                        <div class="title">${link.title || 'بدون عنوان'}</div>
+                        <div class="link">${link.url}</div>
+                    </div>
+                    <a href="${link.url}" target="_blank" title="فتح الرابط"><i class="fas fa-external-link-alt"></i></a>
+                `;
+                resultsList.appendChild(item);
+            });
+        }
+
+        function downloadResults() {
+            if (currentResults.length === 0) {
+                alert('لا توجد نتائج للتحميل');
+                return;
+            }
+            const term = searchQuery || 'search';
+            const content = currentResults.map(r => `${r.title || 'Untitled'} | ${r.url}`).join('\n');
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.download = `${term}.txt`;
+            link.href = URL.createObjectURL(blob);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
+        searchBtn.addEventListener('click', () => performSearch(searchInput.value));
+        searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(searchInput.value); });
+        downloadBtn.addEventListener('click', downloadResults);
+        backButton.addEventListener('click', () => {
+            resultsContainer.style.display = 'none';
+            backButton.classList.remove('show');
+            searchInput.value = '';
+            currentResults = [];
+            downloadBtn.disabled = true;
+            statusText.textContent = '🔍 جاهز للبحث في العمق';
+        });
+        retryBtn.addEventListener('click', checkTor);
+
+        checkTor();
+        setInterval(checkTor, 30000);
+    </script>
+</body>
+</html>

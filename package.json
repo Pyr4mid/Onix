@@ -1,0 +1,16 @@
+{
+  "name": "onix-darkweb",
+  "version": "1.0.0",
+  "description": "Onix - Dark Web Search Engine",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12",
+    "socks-proxy-agent": "^8.0.2"
+  }
+}
